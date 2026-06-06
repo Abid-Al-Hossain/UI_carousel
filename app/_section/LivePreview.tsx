@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { CarouselState } from "../types";
 
 function shell(state: CarouselState): CSSProperties {
@@ -8,17 +8,56 @@ function shell(state: CarouselState): CSSProperties {
 }
 
 export default function LivePreview({ state }: { state: CarouselState }) {
-  const model = state as Record<string, unknown>;
-  const numberValue = (key: string, fallback: number) => typeof model[key] === "number" ? model[key] : fallback;
-  const stringValue = (key: string, fallback: string) => typeof model[key] === "string" ? model[key] : fallback;
-  const boolValue = (key: string) => typeof model[key] === "boolean" ? model[key] : false;
-  const count = numberValue("itemCount", numberValue("rowCount", numberValue("slideCount", numberValue("imageCount", numberValue("filterCount", numberValue("controlCount", 5))))));
-  const items = Array.from({ length: count }, (_, index) => index + 1);
-  const badge = (text: string) => <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: state.border, color: state.accent }}>{text}</span>;
+  const slideCount = Math.max(1, state.slideCount);
+  const initialIndex = Math.min(Math.max(state.activeIndex, 0), slideCount - 1);
+  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  const [paused, setPaused] = useState(!state.autoplay);
+  const slides = Array.from({ length: slideCount }, (_, index) => ({
+    id: `${state.id}-slide-${index + 1}`,
+    title: index === 0 ? state.title : `${state.title} ${index + 1}`,
+    body: index === 0 ? state.description : `${state.helper} Slide ${index + 1} of ${slideCount}.`,
+  }));
+  const safeIndex = Math.min(selectedIndex, slideCount - 1);
+  const selectedSlide = slides[safeIndex] ?? slides[0];
   const panel = shell(state);
-  if ("chartType" in model) return <section role="img" aria-label={state.ariaLabel} style={panel} className="grid content-center"><h3 style={{ fontSize: state.titleSize }}>{state.title}</h3><div className="flex items-end gap-3">{items.map((item) => <div key={item} className="w-10 rounded-t-xl" style={{ height: 36 + item * 18, background: state.accent }} />)}</div></section>;
-  if ("src" in model && ("showTimeline" in model || "showCaptions" in model)) return <section role={state.role} aria-label={state.ariaLabel} style={panel} className="grid content-center"><h3>{state.title}</h3>{"showTimeline" in model ? <audio controls muted={boolValue("muted")} loop={boolValue("loop")} preload={stringValue("preload", "metadata")} className="w-full" /> : <video controls muted={boolValue("muted")} loop={boolValue("loop")} preload={stringValue("preload", "metadata")} poster={stringValue("poster", "")} className="w-full rounded-xl bg-black/40" />}</section>;
-  if (state.role === "dialog") return <div className="grid place-items-center"><section role="dialog" aria-label={state.ariaLabel} style={panel} className="grid"><h3 style={{ fontSize: state.titleSize }}>{state.title}</h3><p style={{ color: stringValue("muted", "#94a3b8") }}>{state.description}</p><div className="flex gap-2"><button type="button" className="rounded-xl px-4 py-2" style={{ background: state.accent, color: "#020617" }}>Action</button><button type="button" className="rounded-xl border px-4 py-2" style={{ borderColor: state.border }}>Cancel</button></div></section></div>;
-  if (state.role === "table") return <table role="table" aria-label={state.ariaLabel} style={panel}><caption>{stringValue("caption", state.title)}</caption><tbody>{items.map((item) => <tr key={item}><th className="p-2 text-left">Row {item}</th><td className="p-2">{state.label}</td></tr>)}</tbody></table>;
-  return <section id={state.id} role={state.role} aria-label={state.ariaLabel} tabIndex={state.tabIndex} style={panel} className="grid content-center"><h3 style={{ fontSize: state.titleSize, fontWeight: state.fontWeight }}>{state.title}</h3><p style={{ color: stringValue("muted", "#94a3b8"), fontSize: state.bodySize }}>{state.description}</p><div className="flex flex-wrap gap-2">{items.map((item) => badge(`${state.label} ${item}`))}</div><p className="text-xs" style={{ color: stringValue("muted", "#94a3b8") }}>{state.helper} · {stringValue("previewState", "default")}</p></section>;
+
+  const goPrevious = () => setSelectedIndex((current) => current === 0 ? (state.loop ? slideCount - 1 : current) : current - 1);
+  const goNext = () => setSelectedIndex((current) => current >= slideCount - 1 ? (state.loop ? 0 : current) : current + 1);
+
+  useEffect(() => {
+    setSelectedIndex(initialIndex);
+  }, [initialIndex]);
+
+  return <section id={state.id} role={state.role} aria-roledescription="carousel" aria-label={state.ariaLabel} tabIndex={state.tabIndex} style={panel} className="grid" onMouseEnter={() => state.pauseOnHover && setPaused(true)} onMouseLeave={() => state.pauseOnHover && setPaused(!state.autoplay)}>
+    <div className="grid gap-4">
+      <header>
+        <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: state.accent }}>{state.label}</p>
+        <h3 className="mt-2" style={{ fontSize: state.titleSize, fontWeight: state.fontWeight }}>{state.title}</h3>
+        <p className="mt-2" style={{ color: state.muted, fontSize: state.bodySize }}>{state.description}</p>
+      </header>
+      <div aria-live={state.autoplay && !paused ? "off" : "polite"} className="overflow-hidden" style={{ borderRadius: Math.max(10, state.radius - 8) }}>
+        <div className="flex" style={{ transform: `translateX(-${safeIndex * 100}%)`, transition: state.motion ? "transform 420ms ease" : "none" }}>
+          {slides.map((slide, index) => {
+            const selected = index === safeIndex;
+            return <article key={slide.id} id={slide.id} role="group" aria-roledescription="slide" aria-label={`Slide ${index + 1} of ${slideCount}: ${slide.title}`} aria-current={selected ? "true" : undefined} aria-hidden={selected ? undefined : true} className="grid shrink-0 content-end gap-3 border p-5" style={{ width: "100%", minHeight: Math.max(160, state.height - state.padding * 2 - 130), borderColor: state.border, borderRadius: Math.max(10, state.radius - 10), background: `linear-gradient(135deg, color-mix(in oklab, ${state.accent} 36%, transparent), rgba(255,255,255,.06))`, opacity: selected ? 1 : 0.45 }}>
+              <span className="text-xs font-bold" style={{ color: state.accent }}>{state.label} {index + 1}</span>
+              <h4 className="m-0" style={{ fontSize: Math.max(20, state.titleSize - 6), fontWeight: state.fontWeight }}>{slide.title}</h4>
+              <p className="m-0" style={{ color: state.muted, fontSize: state.bodySize }}>{slide.body}</p>
+            </article>;
+          })}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {state.showArrows && <div className="flex gap-2">
+          <button type="button" onClick={goPrevious} disabled={state.disabled || (!state.loop && safeIndex === 0)} aria-label="Show previous slide" className="rounded-full border px-4 py-2 text-sm" style={{ borderColor: state.border }}>Previous</button>
+          <button type="button" onClick={goNext} disabled={state.disabled || (!state.loop && safeIndex === slideCount - 1)} aria-label="Show next slide" className="rounded-full px-4 py-2 text-sm font-semibold" style={{ background: state.accent, color: state.background }}>Next</button>
+        </div>}
+        {state.showDots && <div role="group" aria-label="Choose slide" className="flex gap-2">
+          {slides.map((slide, index) => <button key={slide.id} type="button" onClick={() => setSelectedIndex(index)} disabled={state.disabled} aria-label={`Show slide ${index + 1}`} aria-current={index === safeIndex ? "true" : undefined} className="h-2.5 rounded-full" style={{ width: index === safeIndex ? 24 : 10, background: index === safeIndex ? state.accent : state.border }} />)}
+        </div>}
+        {state.autoplay && <button type="button" onClick={() => setPaused((value) => !value)} disabled={state.disabled} aria-pressed={paused} className="rounded-full border px-4 py-2 text-sm" style={{ borderColor: state.border }}>{paused ? "Resume autoplay" : "Pause autoplay"}</button>}
+      </div>
+      <p aria-live="polite" className="text-xs" style={{ color: state.muted }}>{selectedSlide.title} selected. {state.autoplay ? (paused ? "Autoplay paused." : "Autoplay modeled as running.") : "Autoplay off."}</p>
+    </div>
+  </section>;
 }
