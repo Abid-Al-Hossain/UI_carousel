@@ -1,13 +1,36 @@
 "use client";
 
 import { SectionCard } from "@/components/shared/layout/SectionCard";
+import { LabeledField } from "@/components/shared/layout/LabeledField";
 import Slider from "@/components/shared/input/Slider";
-import Switch from "@/components/shared/input/Switch";
+import Select from "@/components/shared/input/Select";
 import type { CarouselState } from "../types";
 
 type Props = { state: CarouselState; update: <K extends keyof CarouselState>(key: K, value: CarouselState[K]) => void };
 
+const EASING_OPTIONS = [
+  { value: "ease", label: "Ease" },
+  { value: "ease-in", label: "Ease In" },
+  { value: "ease-out", label: "Ease Out" },
+  { value: "ease-in-out", label: "Ease In/Out" },
+  { value: "linear", label: "Linear" },
+];
+
 export default function MotionSection({ state, update }: Props) {
-  return <SectionCard title="Motion" subtitle="Motion controls for native carousel generation."><Switch label="Motion safe" checked={state.motion} onChange={(value) => update("motion", value)} />
-<Slider label="Interval" value={state.interval} min={1000} max={10000} step={1} onChange={(value) => update("interval", value)} /></SectionCard>;
+  return (
+    <SectionCard title="Transitions" subtitle="Duration and easing for interactive state changes.">
+      <div className="space-y-4">
+        <LabeledField label={`Duration: ${state.transitionDuration}ms`}>
+          <Slider value={state.transitionDuration} min={0} max={1000} step={10} onChange={(v) => update("transitionDuration", v)} />
+        </LabeledField>
+        <LabeledField label="Easing">
+          <Select
+            value={state.transitionEasing}
+            onChange={(v) => update("transitionEasing", v as CarouselState["transitionEasing"])}
+            options={EASING_OPTIONS}
+          />
+        </LabeledField>
+      </div>
+    </SectionCard>
+  );
 }

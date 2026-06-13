@@ -2,9 +2,33 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { CarouselState } from "../types";
+import { SYSTEM_FONTS } from "@/components/shared/typography/fontConstants";
+
+function resolveFont(state: { fontBucket: "system" | "google"; googleFontFamily: string; systemFontIdx: number }): string {
+  return state.fontBucket === "google"
+    ? `"${state.googleFontFamily}", sans-serif`
+    : (SYSTEM_FONTS[state.systemFontIdx]?.css ?? "inherit");
+}
+
+function buildShadow(state: { shadowEnabled: boolean; shadowX: number; shadowY: number; shadowBlur: number; shadowSpread: number; shadowColor: string; shadowOpacity: number }): string {
+  if (!state.shadowEnabled) return "none";
+  const hex = Math.round(state.shadowOpacity * 255).toString(16).padStart(2, "0");
+  return `${state.shadowX}px ${state.shadowY}px ${state.shadowBlur}px ${state.shadowSpread}px ${state.shadowColor}${hex}`;
+}
+
+function buildRadius(state: { radiusLinked: boolean; radius: number; radiusTL: number; radiusTR: number; radiusBR: number; radiusBL: number }): string {
+  return state.radiusLinked
+    ? `${state.radius}px`
+    : `${state.radiusTL}px ${state.radiusTR}px ${state.radiusBR}px ${state.radiusBL}px`;
+}
 
 function shell(state: CarouselState): CSSProperties {
-  return { width: state.width, minHeight: state.height, padding: state.padding, gap: state.gap, borderRadius: state.radius, border: `${state.borderWidth}px solid ${state.border}`, boxShadow: `0 ${Math.round(state.shadow / 3)}px ${state.shadow}px rgba(0,0,0,.28)`, background: state.background, color: state.foreground, fontFamily: state.fontFamily, opacity: state.disabled ? 0.55 : 1 };
+  return { width: state.width, minHeight: state.height, padding: state.padding, gap: state.gap, borderRadius: buildRadius(state), border: `${state.borderWidth}px ${state.borderStyle} ${state.border}`, boxShadow: buildShadow(state), background: state.background, color: state.foreground, fontFamily: resolveFont(state),
+    fontStyle: state.fontStyle,
+    textTransform: state.textTransform,
+    textDecoration: state.textDecoration,
+    letterSpacing: `${state.letterSpacing}${state.letterSpacingUnit}`,
+    lineHeight: state.lineHeight, opacity: state.disabled ? 0.55 : 1 };
 }
 
 export default function LivePreview({ state }: { state: CarouselState }) {
@@ -36,7 +60,7 @@ export default function LivePreview({ state }: { state: CarouselState }) {
         <p className="mt-2" style={{ color: state.muted, fontSize: state.bodySize }}>{state.description}</p>
       </header>
       <div aria-live={state.autoplay && !paused ? "off" : "polite"} className="overflow-hidden" style={{ borderRadius: Math.max(10, state.radius - 8) }}>
-        <div className="flex" style={{ transform: `translateX(-${safeIndex * 100}%)`, transition: state.motion ? "transform 420ms ease" : "none" }}>
+        <div className="flex" style={{ transform: `translateX(-${safeIndex * 100}%)`, transition: state.transitionDuration > 0 ? "transform 420ms ease" : "none" }}>
           {slides.map((slide, index) => {
             const selected = index === safeIndex;
             return <article key={slide.id} id={slide.id} role="group" aria-roledescription="slide" aria-label={`Slide ${index + 1} of ${slideCount}: ${slide.title}`} aria-current={selected ? "true" : undefined} aria-hidden={selected ? undefined : true} className="grid shrink-0 content-end gap-3 border p-5" style={{ width: "100%", minHeight: Math.max(160, state.height - state.padding * 2 - 130), borderColor: state.border, borderRadius: Math.max(10, state.radius - 10), background: `linear-gradient(135deg, color-mix(in oklab, ${state.accent} 36%, transparent), rgba(255,255,255,.06))`, opacity: selected ? 1 : 0.45 }}>
