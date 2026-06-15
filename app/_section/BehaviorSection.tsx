@@ -7,7 +7,18 @@ import type { CarouselState } from "../types";
 type Props = { state: CarouselState; update: <K extends keyof CarouselState>(key: K, value: CarouselState[K]) => void };
 
 export default function BehaviorSection({ state, update }: Props) {
-  return <SectionCard title="Behavior" subtitle="Behavior controls for native carousel generation."><Switch label="Autoplay" checked={state.autoplay} onChange={(value) => update("autoplay", value)} />
-<Switch label="Loop" checked={state.loop} onChange={(value) => update("loop", value)} />
-<Switch label="Disabled" checked={state.disabled} onChange={(value) => update("disabled", value)} /></SectionCard>;
+  return (
+    <div className="space-y-4">
+      <SectionCard title="Playback" subtitle="Autoplay, looping, and hover pause.">
+        <Switch label="Autoplay" checked={state.autoplay} onChange={(value) => update("autoplay", value)} />
+        <Switch label="Pause on hover" checked={state.pauseOnHover} onChange={(value) => update("pauseOnHover", value)} />
+        <Switch label="Loop" checked={state.loop} onChange={(value) => update("loop", value)} />
+      </SectionCard>
+      <SectionCard title="Controls" subtitle="Navigation arrows and dot indicators.">
+        <Switch label="Show arrows" checked={state.showArrows} onChange={(value) => update("showArrows", value)} />
+        <Switch label="Show dots" checked={state.showDots} onChange={(value) => update("showDots", value)} />
+        <Switch label="Disabled" checked={state.disabled} onChange={(value) => update("disabled", value)} />
+      </SectionCard>
+    </div>
+  );
 }

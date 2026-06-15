@@ -1,4 +1,4 @@
-export type SectionId = "presets" | "basics" | "metadata" | "content" | "items" | "behavior" | "layout" | "placement" | "sizing" | "colors" | "border" | "radius" | "shadow" | "typography" | "transitions" | "focus-ring" | "states" | "accessibility";
+export type SectionId = "presets" | "basics" | "metadata" | "content" | "items" | "behavior" | "layout" | "placement" | "sizing" | "colors" | "border" | "radius" | "shadow" | "typography" | "transitions" | "focus-ring" | "states" | "disabled" | "accessibility";
 
 export type CarouselState = {
   title: string;
@@ -54,11 +54,18 @@ export type CarouselState = {
   muted: string;
   accent: string;
   border: string;
+  itemActiveBg: string;
   titleSize: number;
   bodySize: number;
   fontWeight: number;
   previewState: "default" | "hover" | "focus" | "active" | "open" | "closed" | "selected" | "loading" | "empty" | "error" | "success";
   disabled: boolean;
+  disabledOpacity: number;
+  disabledCursor: "not-allowed" | "default" | "pointer";
+  disabledUseCustomColors: boolean;
+  disabledBg: string;
+  disabledText: string;
+  disabledBorder: string;
   role: "region" | "group";
   slideCount: number;
   activeIndex: number;
@@ -68,6 +75,33 @@ export type CarouselState = {
   interval: number;
   pauseOnHover: boolean;
   loop: boolean;
+  // Arrows
+  arrowBg: string;
+  arrowColor: string;
+  arrowBorder: string;
+  arrowHoverBg: string;
+  arrowHoverColor: string;
+  arrowSize: number;
+  arrowRadius: number;
+  // Dots
+  dotActiveBg: string;
+  dotInactiveBg: string;
+  dotSize: number;
+  dotGap: number;
+  dotBorderRadius: number;
+  // Slides
+  slideRadius: number;
+  animationDuration: number;
+  // Counter
+  counterColor: string;
+  counterBg: string;
+  // Thumbnails
+  thumbnailsEnabled: boolean;
+  thumbActiveBorder: string;
+  thumbHeight: number;
+  // Gestures
+  swipeEnabled: boolean;
+  dragEnabled: boolean;
 };
 
 export type StudioPreset = { id: string; family: string; archetype: string; variant: string; size: string; tags: string[]; state: Partial<CarouselState> & Record<string, unknown> };
@@ -140,6 +174,10 @@ export const SECTIONS: Array<{ id: SectionId; label: string }> = [
   {
     "id": "states",
     "label": "State Preview"
+  },
+  {
+    "id": "disabled",
+    "label": "Disabled"
   },
   {
     "id": "accessibility",

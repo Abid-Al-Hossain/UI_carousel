@@ -10,6 +10,9 @@ export function buildReactCode(state: CarouselState) {
   return `import * as React from "react";
 
 const state = ${JSON.stringify(state, null, 2)};
+function resolveFont(s) { return s.fontBucket === "google" ? '"' + s.googleFontFamily + '", sans-serif' : "inherit"; }
+function buildShadow(s) { if (!s.shadowEnabled) return "none"; var hex = Math.round(s.shadowOpacity * 255).toString(16).padStart(2, "0"); return s.shadowX + "px " + s.shadowY + "px " + s.shadowBlur + "px " + s.shadowSpread + "px " + s.shadowColor + hex; }
+
 
 function clampIndex(index, count) {
   return Math.min(Math.max(index, 0), Math.max(count - 1, 0));
@@ -39,10 +42,11 @@ export default function CarouselComponent() {
   })), [slideCount]);
   const [selectedIndex, setSelectedIndex] = React.useState(() => clampIndex(state.activeIndex, slideCount));
   const [isPaused, setIsPaused] = React.useState(!state.autoplay);
+  const [arrowHover, setArrowHover] = React.useState("");
   const prefersReducedMotion = usePrefersReducedMotion();
   const canAutoplay = state.autoplay && !state.disabled && !prefersReducedMotion;
   const selectedSlide = slides[selectedIndex] ?? slides[0];
-  const transition = state.motion && !prefersReducedMotion ? "transform 420ms ease, opacity 420ms ease" : "none";
+  const transition = (state.transitionDuration > 0) && !prefersReducedMotion ? "transform " + state.animationDuration + "ms ease, opacity " + state.animationDuration + "ms ease" : "none";
 
   React.useEffect(() => {
     setSelectedIndex((current) => clampIndex(current, slideCount));
@@ -76,12 +80,13 @@ export default function CarouselComponent() {
         minHeight: state.height,
         padding: state.padding,
         borderRadius: state.radius,
-        border: state.borderWidth + "px solid " + state.border,
-        boxShadow: "0 " + Math.round(state.shadow / 3) + "px " + state.shadow + "px rgba(0,0,0,.28)",
+        border: state.borderWidth + "px " + state.borderStyle + " " + (state.disabled && state.disabledUseCustomColors ? state.disabledBorder : state.border),
+        boxShadow: buildShadow(state),
         background: state.background,
         color: state.foreground,
-        fontFamily: state.fontFamily,
-        opacity: state.disabled ? 0.55 : 1,
+        fontFamily: resolveFont(state),
+        opacity: state.disabled ? (state.disabledOpacity ?? 0.5) : 1,
+cursor: state.disabled ? state.disabledCursor : undefined,
       }}
     >
       <div style={{ display: "grid", gap: state.gap }}>
@@ -93,7 +98,7 @@ export default function CarouselComponent() {
           <p style={{ margin: "8px 0 0", color: state.muted, fontSize: state.bodySize }}>{state.description}</p>
         </header>
 
-        <div aria-live={canAutoplay && !isPaused ? "off" : "polite"} style={{ overflow: "hidden", borderRadius: Math.max(8, state.radius - 8) }}>
+        <div aria-live={canAutoplay && !isPaused ? "off" : "polite"} data-swipe={state.swipeEnabled} data-drag={state.dragEnabled} style={{ overflow: "hidden", borderRadius: state.slideRadius }}>
           <div style={{ display: "flex", transform: "translateX(-" + selectedIndex * 100 + "%)", transition }}>
             {slides.map((slide, index) => {
               const selected = index === selectedIndex;
@@ -113,9 +118,9 @@ export default function CarouselComponent() {
                     alignContent: "end",
                     gap: 10,
                     padding: Math.max(20, state.padding),
-                    borderRadius: Math.max(10, state.radius - 10),
+                    borderRadius: state.slideRadius,
                     border: "1px solid " + state.border,
-                    background: "linear-gradient(135deg, color-mix(in oklab, " + state.accent + " 38%, transparent), rgba(255,255,255,.06))",
+                    background: "linear-gradient(135deg, " + state.itemActiveBg + ", rgba(255,255,255,.06))",
                     opacity: selected ? 1 : 0.48,
                   }}
                 >
@@ -128,25 +133,35 @@ export default function CarouselComponent() {
           </div>
         </div>
 
+        {state.thumbnailsEnabled && (
+          <div role="group" aria-label="Slide thumbnails" style={{ display: "flex", gap: 8, overflowX: "auto" }}>
+            {slides.map((slide, index) => (
+              <button key={slide.id} type="button" onClick={() => setSelectedIndex(index)} disabled={state.disabled} aria-label={\`Show slide \${index + 1}\`} aria-current={index === selectedIndex ? "true" : undefined} style={{ flexShrink: 0, height: state.thumbHeight, width: Math.round(state.thumbHeight * 1.6), borderRadius: Math.max(4, state.slideRadius - 4), border: "2px solid " + (index === selectedIndex ? state.thumbActiveBorder : state.border), background: "linear-gradient(135deg, " + state.itemActiveBg + ", rgba(255,255,255,.06))", opacity: index === selectedIndex ? 1 : 0.6 }} />
+            ))}
+          </div>
+        )}
+
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           {state.showArrows && (
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={goPrevious} disabled={state.disabled || (!state.loop && selectedIndex === 0)} aria-label="Show previous slide" style={{ border: "1px solid " + state.border, borderRadius: 999, padding: "10px 14px", background: "transparent", color: state.foreground }}>
-                Previous
+              <button type="button" onClick={goPrevious} onMouseEnter={() => setArrowHover("prev")} onMouseLeave={() => setArrowHover("")} disabled={state.disabled || (!state.loop && selectedIndex === 0)} aria-label="Show previous slide" style={{ display: "grid", placeItems: "center", width: state.arrowSize, height: state.arrowSize, border: "1px solid " + state.arrowBorder, borderRadius: state.arrowRadius, background: arrowHover === "prev" ? state.arrowHoverBg : state.arrowBg, color: arrowHover === "prev" ? state.arrowHoverColor : state.arrowColor }}>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              <button type="button" onClick={goNext} disabled={state.disabled || (!state.loop && selectedIndex === slideCount - 1)} aria-label="Show next slide" style={{ border: "1px solid " + state.border, borderRadius: 999, padding: "10px 14px", background: state.accent, color: state.background }}>
-                Next
+              <button type="button" onClick={goNext} onMouseEnter={() => setArrowHover("next")} onMouseLeave={() => setArrowHover("")} disabled={state.disabled || (!state.loop && selectedIndex === slideCount - 1)} aria-label="Show next slide" style={{ display: "grid", placeItems: "center", width: state.arrowSize, height: state.arrowSize, border: "1px solid " + state.arrowBorder, borderRadius: state.arrowRadius, background: arrowHover === "next" ? state.arrowHoverBg : state.arrowBg, color: arrowHover === "next" ? state.arrowHoverColor : state.arrowColor }}>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
             </div>
           )}
 
           {state.showDots && (
-            <div role="group" aria-label="Choose slide" style={{ display: "flex", gap: 8 }}>
+            <div role="group" aria-label="Choose slide" style={{ display: "flex", gap: state.dotGap }}>
               {slides.map((slide, index) => (
-                <button key={slide.id} type="button" onClick={() => setSelectedIndex(index)} disabled={state.disabled} aria-label={\`Show slide \${index + 1}\`} aria-current={index === selectedIndex ? "true" : undefined} style={{ width: index === selectedIndex ? 24 : 10, height: 10, borderRadius: 999, border: 0, background: index === selectedIndex ? state.accent : state.border }} />
+                <button key={slide.id} type="button" onClick={() => setSelectedIndex(index)} disabled={state.disabled} aria-label={\`Show slide \${index + 1}\`} aria-current={index === selectedIndex ? "true" : undefined} style={{ width: index === selectedIndex ? state.dotSize * 2.4 : state.dotSize, height: state.dotSize, borderRadius: state.dotBorderRadius, border: 0, background: index === selectedIndex ? state.dotActiveBg : state.dotInactiveBg }} />
               ))}
             </div>
           )}
+
+          <span style={{ borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, color: state.counterColor, background: state.counterBg }}>{selectedIndex + 1} / {slideCount}</span>
 
           {state.autoplay && (
             <button type="button" onClick={() => setIsPaused((value) => !value)} disabled={state.disabled || prefersReducedMotion} aria-pressed={isPaused} style={{ border: "1px solid " + state.border, borderRadius: 999, padding: "10px 14px", background: "transparent", color: state.foreground }}>
