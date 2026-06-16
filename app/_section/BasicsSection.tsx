@@ -7,8 +7,10 @@ import type { CarouselState } from "../types";
 type Props = { state: CarouselState; update: <K extends keyof CarouselState>(key: K, value: CarouselState[K]) => void };
 
 export default function BasicsSection({ state, update }: Props) {
-  return <SectionCard title="Basics" subtitle="Basics controls for native carousel generation."><Input label="Title" value={state.title} onChange={(value) => update("title", value)} />
+  return <SectionCard title="Basics" subtitle="Basics controls for native carousel generation.">
+      <div className="space-y-4"><Input label="Title" value={state.title} onChange={(value) => update("title", value)} />
 <Input label="Label" value={state.label} onChange={(value) => update("label", value)} />
 <Input label="Description" value={state.description} onChange={(value) => update("description", value)} />
-<Input label="Helper" value={state.helper} onChange={(value) => update("helper", value)} /></SectionCard>;
+<Input label="Helper" value={state.helper} onChange={(value) => update("helper", value)} /></div>
+    </SectionCard>;
 }
