@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { CarouselState } from "../types";
 import { SYSTEM_FONTS } from "@/components/shared/typography/fontConstants";
 
@@ -36,7 +36,10 @@ export default function LivePreview({ state }: { state: CarouselState }) {
   const initialIndex = Math.min(Math.max(state.activeIndex, 0), slideCount - 1);
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
   const [paused, setPaused] = useState(!state.autoplay);
+  const [hovered, setHovered] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [arrowHover, setArrowHover] = useState("");
+  const pointerStart = useRef<{ id: number; x: number; enabled: boolean } | null>(null);
   const slides = Array.from({ length: slideCount }, (_, index) => ({
     id: `${state.id}-slide-${index + 1}`,
     title: index === 0 ? state.title : `${state.title} ${index + 1}`,
@@ -53,14 +56,44 @@ export default function LivePreview({ state }: { state: CarouselState }) {
     setSelectedIndex(initialIndex);
   }, [initialIndex]);
 
-  return <section id={state.id} role={state.role} aria-roledescription="carousel" aria-label={state.ariaLabel} tabIndex={state.tabIndex} style={panel} className="grid" onMouseEnter={() => state.pauseOnHover && setPaused(true)} onMouseLeave={() => state.pauseOnHover && setPaused(!state.autoplay)}>
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!state.autoplay || paused || state.disabled || prefersReducedMotion || (state.pauseOnHover && hovered)) return;
+    const timer = window.setInterval(goNext, Math.max(1000, state.interval));
+    return () => window.clearInterval(timer);
+  });
+
+  const beginGesture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const enabled = event.pointerType === "touch" ? state.swipeEnabled : state.dragEnabled;
+    if (!enabled || state.disabled) return;
+    pointerStart.current = { id: event.pointerId, x: event.clientX, enabled };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const finishGesture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start?.enabled || start.id !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const delta = event.clientX - start.x;
+    if (Math.abs(delta) < 40) return;
+    if (delta > 0) goPrevious(); else goNext();
+  };
+
+  return <section id={state.id} role={state.role} aria-roledescription="carousel" aria-label={state.ariaLabel} tabIndex={state.tabIndex} style={panel} className="grid" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onKeyDown={(event) => { if (state.disabled) return; if (event.key === "ArrowLeft") { event.preventDefault(); goPrevious(); } if (event.key === "ArrowRight") { event.preventDefault(); goNext(); } }}>
     <div className="grid gap-4">
       <header>
         <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: state.accent }}>{state.label}</p>
         <h3 className="mt-2" style={{ fontSize: state.titleSize, fontWeight: state.fontWeight }}>{state.title}</h3>
         <p className="mt-2" style={{ color: state.muted, fontSize: state.bodySize }}>{state.description}</p>
       </header>
-      <div aria-live={state.autoplay && !paused ? "off" : "polite"} data-swipe={state.swipeEnabled} data-drag={state.dragEnabled} className="overflow-hidden" style={{ borderRadius: state.slideRadius }}>
+      <div aria-live={state.autoplay && !paused && !prefersReducedMotion && !(state.pauseOnHover && hovered) ? "off" : "polite"} data-swipe={state.swipeEnabled} data-drag={state.dragEnabled} className="overflow-hidden" style={{ borderRadius: state.slideRadius, touchAction: state.swipeEnabled ? "pan-y" : "auto", cursor: state.dragEnabled ? "grab" : undefined }} onPointerDown={beginGesture} onPointerUp={finishGesture} onPointerCancel={() => { pointerStart.current = null; }}>
         <div className="flex" style={{ transform: `translateX(-${safeIndex * 100}%)`, transition: state.transitionDuration > 0 ? `transform ${state.animationDuration}ms ease` : "none" }}>
           {slides.map((slide, index) => {
             const selected = index === safeIndex;
@@ -88,9 +121,9 @@ export default function LivePreview({ state }: { state: CarouselState }) {
           {slides.map((slide, index) => <button key={slide.id} type="button" onClick={() => setSelectedIndex(index)} disabled={state.disabled} aria-label={`Show slide ${index + 1}`} aria-current={index === safeIndex ? "true" : undefined} style={{ height: state.dotSize, width: index === safeIndex ? state.dotSize * 2.4 : state.dotSize, borderRadius: state.dotBorderRadius, border: 0, background: index === safeIndex ? state.dotActiveBg : state.dotInactiveBg }} />)}
         </div>}
         <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ color: state.counterColor, background: state.counterBg }}>{safeIndex + 1} / {slideCount}</span>
-        {state.autoplay && <button type="button" onClick={() => setPaused((value) => !value)} disabled={state.disabled} aria-pressed={paused} className="rounded-full border px-4 py-2 text-sm" style={{ borderColor: state.border }}>{paused ? "Resume autoplay" : "Pause autoplay"}</button>}
+        {state.autoplay && <button type="button" onClick={() => setPaused((value) => !value)} disabled={state.disabled || prefersReducedMotion} aria-pressed={paused} className="rounded-full border px-4 py-2 text-sm" style={{ borderColor: state.border }}>{prefersReducedMotion ? "Autoplay disabled for reduced motion" : paused ? "Resume autoplay" : "Pause autoplay"}</button>}
       </div>
-      <p aria-live="polite" className="text-xs" style={{ color: state.muted }}>{selectedSlide.title} selected. {state.autoplay ? (paused ? "Autoplay paused." : "Autoplay modeled as running.") : "Autoplay off."}</p>
+      <p aria-live="polite" className="text-xs" style={{ color: state.muted }}>{selectedSlide.title} selected. {state.autoplay ? (paused || prefersReducedMotion || (state.pauseOnHover && hovered) ? "Autoplay paused." : "Autoplay running.") : "Autoplay off."}</p>
     </div>
   </section>;
 }
